@@ -1,0 +1,94 @@
+---
+title: "Titanic"
+author: "Bruno QUEGUINER"
+date: "29 October 2016"
+output:
+  html_document:
+    fig_height: 4.5
+    highlight: tango
+    number_sections: yes
+    theme: readable
+    toc: yes
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+---
+
+#Reading the data
+
+
+```{r Read-data }
+setwd(dir ="C:/Users/QUEGUINER/Desktop/Cours/Autre/Data/Titanic")
+train=read.csv2("train.csv",stringsAsFactors = F)
+test=read.csv2("test.csv",stringsAsFactors = F)
+test=cbind(test[,1],NA,test[,2:ncol(test)])
+colnames(test)=colnames(train)
+full=rbind(train,test)
+```
+
+# Prepare data
+Let's have a look at our data
+```{r Prepare-data}
+str(train)
+
+```
+
+
+# Parameters study
+
+## Survived
+
+
+```{r Pclass}
+barplot(table(train$Survived)/nrow(train),col=c("red","green"))
+```
+
+
+# Random Forest
+
+```{r}
+set.seed(14)
+library(dplyr)
+library(randomForest)
+
+train$Survived=as.factor(train$Survived)
+train$Sex=as.factor(train$Sex)
+train2=select(train,Survived,Sex,Pclass,Age,SibSp,Parch,Fare)
+for(i in 3:ncol(train2)){
+  train2[,i]=as.numeric(as.character(train2[,i]))
+}
+str(train2)
+
+randF=randomForest(Survived ~  .,data=train2, na.action = na.roughfix, ntree=50)
+print(randF)
+
+varImpPlot(randF)
+randF$importance[order(randF$importance[, 1], decreasing = TRUE), ]
+
+plot(train2$Survived ~ train2$Sex,col=c("red","green"))
+plot(train2$Survived ~ train2$Fare, col=c("red","green"))
+
+plot(randF)
+
+```
+
+# Prediction
+
+```{r}
+test$Survived=as.factor(test$Survived)
+test$Sex=as.factor(test$Sex)
+test2=select(test,Survived,Sex,Pclass,Age,SibSp,Parch,Fare)
+for(i in 3:ncol(test2)){
+  test2[,i]=as.numeric(as.character(test2[,i]))
+}
+str(test2)
+
+test2$Age[is.na(test2$Age)]=mean(as.numeric(full$Age),na.rm = T)
+test2$Fare[is.na(test2$Fare)]=mean(as.numeric(full$Fare),na.rm = T)
+
+prediction=predict(randF,test2)
+solution=data.frame(PassengerId=test$PassengerId, Survived=prediction)
+write.table(solution, file = "prediction.csv",row.names = F, sep=",")
+```
+
